@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Travel Pocket 測試版</title>
+<meta name="description" content="旅遊記帳與分帳 — 極簡淡色系旅費記帳 App">
+<!-- PWA 設定：加到主畫面後全螢幕、無瀏覽器介面 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TP 測試版">
+<meta name="theme-color" content="#EFEEE9">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== 頁面 0：第一次使用（沒有旅程時的首頁） ===== -->
+<main id="view-onboard" class="view">
+  <div class="ob-wrap">
+    <header class="ob-head">
+      <h1>開始你的<br>第一趟旅程<span class="dot">.</span></h1>
+      <p class="subtitle">記錄旅費、自動換算台幣，離線也能用</p>
+    </header>
+
+    <input type="text" class="ob-name" id="obName" placeholder="東京" maxlength="20" autocomplete="off">
+
+    <div class="ob-fields">
+      <label class="setting-row">
+        <span>去程</span>
+        <input type="date" id="obStart">
+      </label>
+      <label class="setting-row">
+        <span>回程<span class="muted small">　選填</span></span>
+        <input type="date" id="obEnd">
+      </label>
+      <label class="setting-row">
+        <span>當地貨幣</span>
+        <select id="obCur"></select>
+      </label>
+      <div class="setting-row col">
+        <span>同行的人<span class="muted small">　選填，要分帳才需要</span></span>
+        <div class="member-editor" id="obMembers"></div>
+      </div>
+      <label class="setting-row">
+        <span>預算<span class="muted small">　選填</span></span>
+        <input type="text" inputmode="numeric" id="obBudget" placeholder="NT$ 30,000">
+      </label>
+      <label class="setting-row">
+        <span>現金<span class="muted small">　選填</span></span>
+        <input type="text" inputmode="numeric" id="obCash" placeholder="¥ 118,000">
+      </label>
+    </div>
+
+    <button class="btn-save ob-go" id="obGo">開始記帳</button>
+  </div>
+</main>
+
+<!-- ===== 頁面 1：記帳（主頁） ===== -->
+<main id="view-home" class="view active">
+ <!-- 上方固定區：標題、金額、天數列 -->
+ <div class="home-top">
+  <header class="page-head">
+    <!-- 旅程名稱＝首頁標題，點一下改名與改日期 -->
+    <h1 class="h1-edit" id="tripTitle"></h1>
+    <p class="subtitle" id="homeSubtitle"></p>
+    <!-- 進入旅程列表 -->
+    <button class="head-btn" id="btnTrips" aria-label="切換旅程"><span class="tab-icon" data-icon="trip"></span></button>
+  </header>
+
+  <!-- 提醒橫幅（補記／備份），由 app.js 控制 -->
+  <div id="homeBanner" hidden></div>
+
+  <!-- 當日大數字 -->
+  <section class="hero">
+    <div class="hero-label" id="heroDayLabel">今日支出</div>
+    <div class="hero-num"><span class="hero-yen" id="heroYen">¥</span><span id="heroJpy">0</span></div>
+    <div class="chip-row">
+      <span class="chip" id="heroTwdChip">≈ NT$0</span>
+      <span class="chip" id="heroCountChip">0 筆</span>
+      <span class="chip" id="heroBudgetChip" hidden></span>
+      <span class="chip chip-accent" id="heroCashChip" hidden></span>
+    </div>
+    <!-- 現金日預算／續航提示 -->
+    <div class="cash-hint" id="cashHint" hidden></div>
+  </section>
+
+  <!-- 天數選擇列（Day 1、Day 2…水平捲動） -->
+  <nav class="day-chips" id="dayChips" aria-label="選擇天數"></nav>
+ </div>
+
+  <!-- 當日消費清單：只有這裡會上下捲動 -->
+  <ul class="entry-list" id="entryList"></ul>
+</main>
+
+<!-- ===== 頁面 2：統計 ===== -->
+<main id="view-stats" class="view">
+  <header class="page-head">
+    <h1>統計<span class="dot">.</span></h1>
+    <p class="subtitle" id="statsSubtitle">旅程總覽</p>
+  </header>
+
+  <!-- 旅程總計大數字 -->
+  <section class="hero">
+    <div class="hero-label">旅程總支出</div>
+    <div class="hero-num"><span class="hero-yen" id="totalYen">¥</span><span id="totalJpy">0</span></div>
+    <div class="chip-row">
+      <span class="chip chip-accent" id="totalTwdChip">≈ NT$0</span>
+      <span class="chip" id="totalDaysChip">0 天</span>
+      <span class="chip" id="avgDayChip"></span>
+      <span class="chip" id="paySplitChip" hidden></span>
+    </div>
+  </section>
+
+  <!-- 分類佔比 -->
+  <section class="card">
+    <div class="card-label">分類佔比</div>
+    <div class="donut-wrap">
+      <svg id="donutSvg" viewBox="0 0 200 200" role="img" aria-label="各分類支出佔比圓環圖"></svg>
+      <div class="donut-center">
+        <div class="donut-center-name" id="donutCenterName">全部</div>
+        <div class="donut-center-val" id="donutCenterVal"></div>
+        <div class="donut-center-pct" id="donutCenterPct"></div>
+      </div>
+    </div>
+    <!-- 分類清單：同時是圖例與數據表 -->
+    <ul class="cat-legend" id="catLegend"></ul>
+  </section>
+
+  <!-- 每日支出 -->
+  <section class="card">
+    <div class="card-label">每日支出</div>
+    <div class="bars-wrap"><svg id="barsSvg" role="img" aria-label="每日支出長條圖"></svg></div>
+    <div class="bars-tip" id="barsTip"></div>
+  </section>
+</main>
+
+<!-- ===== 頁面 2.5：分帳 ===== -->
+<main id="view-split" class="view">
+  <header class="page-head">
+    <h1>分帳<span class="dot">.</span></h1>
+    <p class="subtitle" id="splitSubtitle"></p>
+  </header>
+
+  <!-- 沒有同行者時的空狀態 -->
+  <div id="splitEmpty" hidden>
+    <p class="empty">這趟還沒有同行者<br>加一位就能開始分帳</p>
+    <button class="btn-new-trip" id="btnAddMember">＋ 新增同行者</button>
+  </div>
+
+  <div id="splitBody">
+    <!-- 誰該給誰 -->
+    <section class="card settle-card">
+      <div class="card-head">
+        <span class="card-title">誰該給誰</span>
+        <button class="link-btn" id="btnSplitTwd" hidden></button>
+      </div>
+      <ul class="transfer-list" id="transferList"></ul>
+      <button class="btn-save btn-share" id="btnShareSplit" hidden>分享到 LINE</button>
+      <button class="link-btn more-btn" id="btnSplitDetail" hidden></button>
+      <div id="splitDetailBox" hidden>
+        <ul class="person-list" id="personList"></ul>
+        <div class="sub-label" id="repayLabel" hidden>已經還的</div>
+        <ul class="transfer-list" id="repayList"></ul>
+      </div>
+    </section>
+
+    <div class="list-label" id="splitListLabel" hidden>分帳帳目</div>
+    <ul class="entry-list" id="splitList"></ul>
+  </div>
+</main>
+
+<!-- ===== 頁面 0：旅程列表（記帳的上一層） ===== -->
+<main id="view-trips" class="view">
+  <header class="page-head">
+    <h1>Travel Pocket<span class="dot">.</span></h1>
+    <p class="subtitle">選擇或新增旅遊記帳計劃</p>
+  </header>
+  <ul class="entry-list" id="tripList"></ul>
+  <button class="btn-new-trip" id="btnNewTrip">＋ 新增旅程</button>
+  <p class="credit muted small">Paianan Design</p>
+</main>
+
+<!-- ===== 頁面 3：設定 ===== -->
+<main id="view-settings" class="view">
+  <header class="page-head">
+    <h1>設定<span class="dot">.</span></h1>
+    <p class="subtitle">旅程與匯率</p>
+  </header>
+
+  <section class="card">
+    <div class="card-label">目前旅程</div>
+    <!-- 名稱與日期統一由「旅程資訊」面板編輯，避免兩處不同步 -->
+    <button class="setting-row row-btn" id="btnEditTrip">
+      <span>名稱與日期</span>
+      <span class="row-val" id="tripInfoShow"></span>
+    </button>
+    <label class="setting-row">
+      <span>記帳貨幣<br><span class="muted small">金額實際存成這個幣別</span></span>
+      <select id="tripCurSelect"></select>
+    </label>
+    <label class="setting-row" id="rowDisplay">
+      <span>畫面顯示<br><span class="muted small">只影響顯示，不動記錄</span></span>
+      <select id="displaySelect">
+        <option value="TWD">台幣 NT$</option>
+        <option value="LOCAL">記帳貨幣</option>
+      </select>
+    </label>
+    <label class="setting-row">
+      <span>預算<br><span class="muted small">台幣，含刷卡</span></span>
+      <input type="text" inputmode="numeric" id="tripBudgetInput" placeholder="未填">
+    </label>
+    <label class="setting-row" id="rowExTwd">
+      <span>換匯台幣<br><span class="muted small">實際付的台幣</span></span>
+      <input type="text" inputmode="numeric" id="tripExTwdInput" placeholder="未填">
+    </label>
+    <label class="setting-row" id="rowExJpy">
+      <span id="labelExJpy">換到當地貨幣<br><span class="muted small">實際拿到的金額</span></span>
+      <input type="text" inputmode="numeric" id="tripExJpyInput" placeholder="未填">
+    </label>
+    <div class="setting-row col">
+      <span>同行的人<br><span class="muted small">有分帳紀錄的人不能刪除</span></span>
+      <div class="member-editor" id="tripMembers"></div>
+    </div>
+    <label class="setting-row" id="rowMe" hidden>
+      <span>我是<br><span class="muted small">分帳要帶進個人記帳時用</span></span>
+      <select id="meSelect"></select>
+    </label>
+  </section>
+
+  <section class="card" id="rateCard">
+    <div class="card-label" id="rateCardLabel">匯率 · 日圓 → 台幣</div>
+    <div class="setting-row">
+      <span>自動匯率</span>
+      <span class="num" id="autoRateShow">—</span>
+    </div>
+    <div class="setting-row">
+      <span class="muted small" id="rateUpdatedAt">尚未取得</span>
+      <button class="btn-small" id="btnRefreshRate">重新抓取</button>
+    </div>
+    <label class="setting-row">
+      <span>手動匯率<br><span class="muted small">留空＝使用自動</span></span>
+      <input type="text" inputmode="decimal" id="manualRateInput" placeholder="例：0.21">
+    </label>
+    <div class="setting-row">
+      <span>刷卡匯率<br><span class="muted small">牌價＋手續費</span></span>
+      <span class="num" id="cardRateShow">—</span>
+    </div>
+    <label class="setting-row">
+      <span>刷卡手續費 %<br><span class="muted small">台灣的卡多為 1.5%</span></span>
+      <input type="text" inputmode="decimal" id="cardFeeInput" placeholder="1.5">
+    </label>
+  </section>
+
+  <section class="card">
+    <div class="card-label">資料</div>
+    <div class="setting-row">
+      <span>共 <span id="entryCount">0</span> 筆記錄</span>
+      <button class="btn-small" id="btnExport">匯出 JSON</button>
+    </div>
+    <div class="setting-row">
+      <span class="muted small">從備份檔還原<br>會覆蓋目前資料</span>
+      <button class="btn-small" id="btnImport">匯入 JSON</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+    <div class="setting-row">
+      <span class="muted small">刪除目前旅程的所有記錄<br>無法復原</span>
+      <button class="btn-small danger" id="btnClear">清除此旅程</button>
+    </div>
+  </section>
+
+  <p class="version muted small">測試版 · 資料與正式版分開存，不影響你現在用的記帳</p>
+</main>
+
+<!-- 新增按鈕 -->
+<button class="fab" id="fabAdd" aria-label="新增一筆消費">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<!-- 底部分頁列（icon 由 app.js 注入） -->
+<nav class="tabbar" id="tabbar">
+  <button class="tab active" data-view="view-home"><span class="tab-icon" data-icon="home"></span>記帳</button>
+  <button class="tab" data-view="view-split"><span class="tab-icon" data-icon="split"></span>分帳</button>
+  <button class="tab" data-view="view-stats"><span class="tab-icon" data-icon="stats"></span>統計</button>
+  <button class="tab" data-view="view-settings"><span class="tab-icon" data-icon="settings"></span>設定</button>
+</nav>
+
+<!-- ===== 輸入面板（bottom sheet） ===== -->
+<div class="sheet-mask" id="sheetMask"></div>
+<section class="sheet" id="entrySheet" aria-label="輸入消費">
+  <div class="sheet-handle" aria-hidden="true"><div class="sheet-grip"></div></div>
+  <!-- 這筆會記到哪一天（點了可改） -->
+  <button class="sheet-day" id="sheetDayBtn"></button>
+  <div class="amount-block">
+    <div class="amount-jpy"><span class="yen" id="curSymbol">¥</span><span id="amountShow">0</span></div>
+    <div class="amount-twd" id="amountTwd">≈ NT$0</div>
+  </div>
+  <!-- 幣別選擇（單一按鈕，點開選全部幣別） + 付款方式 -->
+  <div class="toggle-row">
+    <button class="cur-btn" id="curBtn" aria-label="選擇輸入幣別"></button>
+    <div class="cur-toggle" id="payToggle" role="radiogroup" aria-label="付款方式">
+      <button data-pay="cash" class="active">現金</button>
+      <button data-pay="card">刷卡</button>
+    </div>
+  </div>
+  <!-- 分類選擇（icon 由 app.js 注入） -->
+  <div class="cat-chips" id="catChips" role="radiogroup" aria-label="分類"></div>
+  <input type="text" class="note-input" id="noteInput" placeholder="備註（選填）例：一蘭拉麵" maxlength="30">
+  <!-- 自訂數字鍵盤 -->
+  <div class="keypad" id="keypad">
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button data-k="00">00</button><button data-k="0">0</button><button data-k="del" aria-label="刪除一位">⌫</button>
+  </div>
+  <div class="sheet-actions">
+    <button class="btn-delete" id="btnDelete" hidden>刪除</button>
+    <button class="btn-save" id="btnSave">記一筆</button>
+  </div>
+</section>
+
+<!-- ===== 新增旅程面板 ===== -->
+<section class="sheet" id="tripSheet" aria-label="新增旅程">
+  <div class="sheet-handle" aria-hidden="true"><div class="sheet-grip"></div></div>
+  <div class="sheet-title" id="tripSheetTitle">新增旅程</div>
+  <input type="text" class="note-input" id="newTripName" placeholder="城市名稱，例：東京" maxlength="20">
+  <label class="setting-row">
+    <span>當地貨幣</span>
+    <select id="newTripCur"></select>
+  </label>
+  <div class="setting-row col">
+    <span>同行的人<span class="muted small">　選填，要分帳才需要</span></span>
+    <div class="member-editor" id="newTripMembers"></div>
+  </div>
+  <label class="setting-row">
+    <span>去程日期</span>
+    <input type="date" id="newTripStart">
+  </label>
+  <label class="setting-row">
+    <span>回程日期<br><span class="muted small">選填</span></span>
+    <input type="date" id="newTripEnd">
+  </label>
+  <label class="setting-row">
+    <span>預算<br><span class="muted small">台幣，選填</span></span>
+    <input type="text" inputmode="numeric" id="newTripBudget" placeholder="例：30000">
+  </label>
+  <div class="card-label" style="margin-top:14px">換匯（選填）— 填了就用你的實際匯率換算，並追蹤現金餘額</div>
+  <label class="setting-row">
+    <span>台幣付了</span>
+    <input type="text" inputmode="numeric" id="newTripExTwd" placeholder="例：25000">
+  </label>
+  <label class="setting-row">
+    <span>換到當地貨幣</span>
+    <input type="text" inputmode="numeric" id="newTripExJpy" placeholder="例：118000">
+  </label>
+  <div class="sheet-actions">
+    <button class="btn-save" id="btnCreateTrip">建立旅程</button>
+  </div>
+</section>
+
+<!-- ===== 記到哪一天面板 ===== -->
+<section class="sheet cur-sheet" id="daySheet" aria-label="選擇記到哪一天">
+  <div class="sheet-handle" aria-hidden="true"><div class="sheet-grip"></div></div>
+  <div class="sheet-title">這筆記到哪一天？</div>
+  <div class="cur-grid day-grid" id="dayGrid"></div>
+</section>
+
+<!-- ===== 旅程日期面板（從主頁 Day 列直接開） ===== -->
+<section class="sheet cur-sheet" id="dateSheet" aria-label="設定旅程日期">
+  <div class="sheet-handle" aria-hidden="true"><div class="sheet-grip"></div></div>
+  <div class="sheet-title">旅程資訊</div>
+  <p class="cur-hint muted small">改日期後 Day 1、Day 2… 會自動重新對應</p>
+  <input type="text" class="note-input" id="dateSheetName" placeholder="旅程名稱" maxlength="20">
+  <label class="setting-row">
+    <span>去程日期</span>
+    <input type="date" id="dateSheetStart">
+  </label>
+  <label class="setting-row">
+    <span>回程日期<br><span class="muted small">選填</span></span>
+    <input type="date" id="dateSheetEnd">
+  </label>
+  <div class="sheet-actions">
+    <button class="btn-save" id="btnDateSave">完成</button>
+  </div>
+</section>
+
+<!-- ===== 幣別選擇面板 ===== -->
+<section class="sheet cur-sheet" id="curSheet" aria-label="選擇輸入幣別">
+  <div class="sheet-handle" aria-hidden="true"><div class="sheet-grip"></div></div>
+  <div class="sheet-title">用什麼幣別輸入？</div>
+  <p class="cur-hint muted small">會自動換算成旅程主貨幣記錄，原始金額也會保留</p>
+  <div class="cur-grid" id="curGrid"></div>
+</section>
+
+<!-- ===== 分帳面板 ===== -->
+<section class="sheet tall" id="splitSheet" aria-label="記一筆分帳">
+  <div class="sheet-handle" aria-hidden="true"><div class="sheet-grip"></div></div>
+
+  <div class="sheet-scroll">
+    <!-- 一打開最上面就是成員，和記帳面板一眼分得出來 -->
+    <div class="field-label">這筆是誰付的？</div>
+    <div class="payer-chips" id="payerChips" role="radiogroup" aria-label="誰付的"></div>
+
+    <div class="sheet-top">
+      <label class="sheet-day"><span id="splitDayText"></span><input type="date" id="splitDate" aria-label="日期"></label>
+      <button class="sheet-day" id="splitCurBtn" aria-label="換幣別"></button>
+    </div>
+
+    <div class="amount-block">
+      <div class="amount-jpy"><span class="yen" id="splitCurSymbol">¥</span><span id="splitAmountShow">0</span></div>
+      <div class="amount-twd" id="splitAmountSub"></div>
+    </div>
+
+    <input type="text" class="note-input" id="splitNote" placeholder="買了什麼？例：燒肉晚餐" maxlength="30">
+
+    <div class="field-label split-head">
+      <span>要分給誰？</span>
+      <span class="per-person" id="perPerson"></span>
+    </div>
+    <div class="who-chips" id="whoChips"></div>
+    <div class="share-grid" id="shareGrid" hidden></div>
+    <button class="link-btn mode-btn" id="modeBtn"></button>
+  </div>
+
+  <div class="keypad" id="splitKeypad">
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button data-k="00">00</button><button data-k="0">0</button><button data-k="del" aria-label="刪除一位">⌫</button>
+  </div>
+  <div class="sheet-actions">
+    <button class="btn-delete" id="btnSplitDelete" hidden>刪除</button>
+    <button class="btn-save" id="btnSplitSave">記一筆</button>
+  </div>
+</section>
+
+<!-- 小提示（可帶一顆動作鈕，例如「復原」） -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

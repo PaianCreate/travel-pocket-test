@@ -1,0 +1,682 @@
+/* ============================================
+   Pocket Bill — 極簡淡色系
+   底：米白　卡片：淺灰　點綴：柔黃
+   ============================================ */
+
+:root {
+  color-scheme: light; /* 日期選單等原生元件也固定淺色 */
+  /* 色彩（可在 console 用 PB.setVar('--accent','#xxx') 即時調） */
+  --bg: #EFEEE9;          /* 頁面底色：暖淺灰 */
+  --card: #E2E1DA;        /* 色塊卡片：淺灰 */
+  --card-2: #FBFAF7;      /* 清單列：暖白 */
+  --ink: #21251E;         /* 主文字：墨綠近黑 */
+  --ink-2: #4F5349;       /* 次要文字 */
+  --muted: #5F6359;       /* 淡灰標籤（已調到對比 4.5:1 以上） */
+  --accent: #C9E86F;      /* 特別色：萊姆綠 */
+  --line: rgba(32,37,30,.08);/* 分隔線 */
+  --danger: #C0442E;      /* 刪除紅 */
+  /* 圖表分類色（已通過色盲驗證，順序固定不可循環） */
+  --c-food: #C7522A; --c-transit: #0E93A6; --c-shop: #B58300;
+  --c-stay: #7B5EA7; --c-ticket: #35854A; --c-other: #2E77BE;
+  --radius: 22px;
+}
+
+/* 固定淺色版：不跟隨系統深色模式（Paian 指定淺灰色系為主） */
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* hidden 屬性要蓋得過各種 display 設定（例如 .setting-row 的 flex） */
+[hidden] { display: none !important; }
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, "SF Pro Text", "PingFang TC", "Noto Sans TC", sans-serif;
+  background: var(--bg); color: var(--ink);
+  min-height: 100dvh;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  user-select: none; -webkit-user-select: none;
+}
+input, button { font-family: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+.num, .hero-num, .amount-jpy, .e-jpy { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: .78rem; }
+
+/* ===== 頁面切換 ===== */
+.view {
+  display: none;
+  padding: calc(env(safe-area-inset-top) + 20px) 22px 140px;
+  max-width: 480px; margin: 0 auto;
+}
+.view.active { display: block; animation: fadeUp .28s ease; }
+
+/* 首頁：上方固定，只有記帳清單自己捲動 */
+#view-home.active { display: flex; flex-direction: column; height: 100dvh; padding-bottom: 0; overflow: hidden; }
+#view-home .home-top { flex: 0 0 auto; }
+#view-home .entry-list {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 150px); /* 讓最後一筆不被分頁列與 + 鈕擋住 */
+  scrollbar-width: none;
+}
+#view-home .entry-list::-webkit-scrollbar { display: none; }
+/* 捲動時頂端淡出，讓卡片看起來是滑進天數列底下，而不是被硬切 */
+#view-home .entry-list.scrolled {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 16px);
+}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .view.active, .sheet, .fab svg { animation: none !important; transition: none !important; } }
+
+/* ===== 第一次使用畫面 ===== */
+#view-onboard.active { display: flex; flex-direction: column; min-height: 100dvh; padding-bottom: 0; } /* 沒有分頁列，不需要預留 140px */
+.ob-wrap { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; padding: 14px 0 40px; }
+/* 用 id 提高優先權：.btn-save 的 flex:1 是給輸入面板底排用的，這裡不能被它撐開或壓扁 */
+#view-onboard .ob-wrap > * { flex: 0 0 auto; }
+.ob-head { margin-bottom: 26px; }
+.ob-head h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: -.025em; line-height: 1.22; }
+.ob-head .subtitle { margin-top: 8px; }
+/* 城市名稱是主角，用大字輸入 */
+.ob-name {
+  width: 100%; background: none; border: 0; border-bottom: 2px solid var(--line);
+  padding: 6px 0 12px; margin-bottom: 20px;
+  font-size: 2.2rem; font-weight: 650; letter-spacing: -.025em; color: var(--ink);
+}
+.ob-name::placeholder { color: var(--muted); opacity: .55; }
+.ob-name:focus { outline: none; border-bottom-color: var(--accent); }
+.ob-fields { background: var(--card); border-radius: var(--radius); padding: 6px 18px; margin-bottom: 22px; }
+#view-onboard .ob-go { width: 100%; height: 56px; font-size: 1.02rem; }
+
+/* 空間不夠時（矮螢幕）縮小大標與間距 */
+@media (max-height: 620px) {
+  .ob-head h1 { font-size: 1.62rem; }
+  .ob-head { margin-bottom: 16px; }
+  .ob-head .subtitle { font-size: .86rem; }
+  .ob-name { font-size: 1.75rem; padding-bottom: 9px; margin-bottom: 14px; }
+  .ob-fields { padding: 2px 18px; margin-bottom: 16px; }
+  .ob-fields .setting-row { padding: 8px 0; }
+}
+
+/* ===== 頁首 ===== */
+.page-head { margin: 18px 0 26px; position: relative; }
+#view-home .page-head { margin: 4px 0 14px; }
+.head-btn {
+  position: absolute; top: 2px; right: 0;
+  width: 44px; height: 44px; border-radius: 15px;
+  background: var(--card); display: grid; place-items: center;
+}
+.head-btn svg { width: 21px; height: 21px; stroke: var(--ink); }
+.page-head h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -.02em; }
+/* 可編輯的標題（首頁旅程名） */
+.h1-edit {
+  display: block; padding-right: 56px; /* 避開右上角旅程按鈕 */
+  text-align: left; color: inherit; font: inherit;
+  overflow-wrap: anywhere; line-height: 1.25;
+}
+/* 鉛筆跟著文字流走，換行時才不會被孤立在第一行 */
+.h1-edit .pen {
+  display: inline-block; vertical-align: 15%;
+  width: 18px; height: 18px; margin-left: 9px; stroke: var(--muted);
+}
+.h1-edit:active { opacity: .55; }
+#view-home .subtitle { padding-right: 56px; } /* 只有首頁右上角有按鈕要避開 */
+.page-head .dot { color: var(--accent); }
+.subtitle { color: var(--muted); font-size: .95rem; margin-top: 4px; font-weight: 400; }
+
+/* ===== 提醒橫幅 ===== */
+.banner {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border-left: 3px solid var(--accent);
+  border-radius: 14px; padding: 12px 14px; margin-bottom: 18px;
+  font-size: .85rem; color: var(--ink-2);
+}
+.banner-text { flex: 1; line-height: 1.5; }
+.banner .btn-small { background: var(--ink); color: var(--bg); flex: 0 0 auto; }
+.banner-x { color: var(--muted); font-size: 1.05rem; padding: 4px 6px; flex: 0 0 auto; }
+
+/* ===== 大數字 hero ===== */
+.hero { margin-bottom: 26px; }
+.hero-label { font-size: .8rem; color: var(--muted); letter-spacing: .04em; margin-bottom: 6px; }
+.hero-num { font-size: 3.6rem; font-weight: 640; letter-spacing: -.035em; line-height: 1.05; }
+/* 首頁壓縮上方高度，把空間讓給清單 */
+#view-home .hero { margin-bottom: 14px; }
+#view-home .hero-label { margin-bottom: 2px; }
+#view-home .hero-num { font-size: 2.9rem; }
+#view-home .hero-yen { font-size: 1.6rem; }
+#view-home .chip-row { margin-top: 10px; }
+#view-home .cash-hint { margin-top: 8px; }
+#view-home .day-chips { margin-bottom: 12px; }
+.hero-yen { font-size: 2rem; font-weight: 500; color: var(--ink-2); margin-right: 2px; }
+.chip-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.chip {
+  background: var(--card); border-radius: 999px;
+  padding: 6px 12px; font-size: .8rem; color: var(--ink-2);
+}
+.chip-accent { background: var(--accent); color: #21251E; }
+
+/* 現金日預算提示 */
+.cash-hint { margin-top: 10px; font-size: .8rem; color: var(--ink-2); }
+.cash-hint b { font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ===== 天數選擇列 ===== */
+.day-chips {
+  display: flex; gap: 8px; overflow-x: auto; margin: 0 -22px 18px;
+  padding: 2px 22px 8px; scrollbar-width: none;
+}
+.day-chips::-webkit-scrollbar { display: none; }
+.day-chip {
+  flex: 0 0 auto; background: var(--card); border-radius: 16px;
+  padding: 9px 14px; font-size: .82rem; color: var(--ink-2);
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  transition: background .15s, color .15s;
+}
+.day-chip small { font-size: .66rem; color: var(--muted); }
+.day-chip.active { background: var(--ink); color: var(--bg); }
+.day-chip.active small { color: var(--bg); opacity: .6; }
+.day-chip-edit {
+  background: none; border: 1.5px dashed var(--muted); color: var(--ink-2);
+  justify-content: center;
+}
+.day-chip-edit svg { width: 17px; height: 17px; stroke: currentColor; }
+
+/* ===== 消費清單（可左滑刪除） ===== */
+.entry-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.entry-list > li { flex: 0 0 auto; } /* 不讓列被壓扁，超出就捲動 */
+.entry-row { position: relative; border-radius: 18px; overflow: hidden; }
+.entry-del {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 80px;
+  background: var(--danger); color: #fff;
+  font-size: .85rem; font-weight: 600; border-radius: 0 18px 18px 0;
+}
+.entry {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card-2); border-radius: 18px; padding: 14px 16px;
+  transition: transform .2s ease; touch-action: pan-y;
+}
+.e-icon {
+  width: 40px; height: 40px; border-radius: 13px; flex: 0 0 auto;
+  display: grid; place-items: center; background: var(--card);
+}
+.e-icon svg { width: 20px; height: 20px; stroke: var(--ink); }
+.e-main { flex: 1; min-width: 0; }
+.e-note { font-size: .92rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.e-time { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.e-amount { text-align: right; }
+.e-jpy { font-size: 1rem; font-weight: 600; letter-spacing: -.01em; }
+.e-twd { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.empty {
+  text-align: center; color: var(--muted); font-size: .88rem;
+  padding: 48px 0; line-height: 1.8;
+}
+
+/* ===== 旅程列表 ===== */
+/* 內容少時署名靠底，內容多時自然接在清單後面 */
+#view-trips.active { display: flex; flex-direction: column; min-height: 100dvh; }
+.credit { margin-top: auto; padding-top: 30px; text-align: center; letter-spacing: .02em; }
+.trip-card { flex-wrap: wrap; padding: 18px; }
+.t-name { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; flex: 1; display: flex; align-items: center; gap: 8px; }
+.t-badge {
+  font-size: .64rem; font-weight: 600; color: #21251E;
+  background: var(--accent); border-radius: 999px; padding: 3px 9px;
+}
+.t-total { text-align: right; }
+.t-jpy { font-size: 1.05rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.t-meta { width: 100%; margin-top: 6px; font-size: .76rem; color: var(--muted); }
+.btn-new-trip {
+  width: 100%; margin-top: 16px; height: 54px; border-radius: 18px;
+  border: 1.5px dashed var(--muted); color: var(--ink-2);
+  font-size: .95rem; font-weight: 500;
+}
+.sheet-title { font-size: 1.05rem; font-weight: 650; margin: 2px 0 14px; text-align: center; }
+
+/* ===== 卡片（統計、設定） ===== */
+.card {
+  background: var(--card); border-radius: var(--radius);
+  padding: 20px; margin-bottom: 14px;
+}
+.card-label { font-size: .74rem; color: var(--muted); letter-spacing: .06em; margin-bottom: 14px; }
+
+/* ===== 圓環圖 ===== */
+.donut-wrap { position: relative; width: 200px; margin: 6px auto 16px; }
+.donut-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none;
+}
+.donut-center-name { font-size: .78rem; color: var(--muted); }
+.donut-center-val { font-size: 1.15rem; font-weight: 650; letter-spacing: -.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.donut-seg { transition: opacity .15s; cursor: pointer; }
+.donut-seg.dim { opacity: .25; }
+
+/* 分類圖例（也是數據表） */
+.cat-legend { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+/* 分類列做成明確的可點按鈕 */
+.cat-row {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  background: var(--card-2); border-radius: 14px; padding: 12px 14px;
+  font-size: .88rem; color: var(--ink);
+  transition: background .15s, color .15s;
+}
+.cat-row:active { transform: scale(.985); }
+.l-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.l-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+.l-icon svg { width: 16px; height: 16px; stroke: currentColor; opacity: .6; }
+.l-name { flex: 1; text-align: left; }
+.l-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.chev { width: 15px; height: 15px; flex: 0 0 auto; opacity: .4; transition: transform .2s; }
+.chev svg { width: 15px; height: 15px; stroke: currentColor; }
+/* 展開中的分類：沿用 Day 列的選取樣式 */
+.cat-item.open .cat-row { background: var(--ink); color: var(--bg); border-radius: 14px 14px 0 0; }
+.cat-item.open .chev { transform: rotate(90deg); opacity: .7; }
+/* 明細：左邊日期、右邊金額 */
+/* 用 grid + display:contents，讓每一列的金額欄位上下對齊 */
+.cat-sub {
+  list-style: none; background: var(--card-2);
+  border-radius: 0 0 14px 14px; padding: 2px 14px 6px;
+  display: grid; grid-template-columns: 1fr auto auto; /* 不用 column-gap，分隔線才不會斷開 */
+}
+.cat-sub li { display: contents; }
+.cat-sub li > span {
+  padding-top: 11px; padding-bottom: 11px; /* 只設上下，左內距留給各欄自己 */
+  border-top: 1px solid var(--line);
+  font-size: .84rem; display: flex; align-items: center;
+}
+.ce-day { color: var(--ink-2); }
+.ce-orig { color: var(--muted); justify-content: flex-end; padding-left: 12px; font-variant-numeric: tabular-nums; }
+.ce-amt { font-weight: 600; justify-content: flex-end; padding-left: 14px; font-variant-numeric: tabular-nums; }
+/* 中心的佔比 */
+.donut-center-pct { font-size: .74rem; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* ===== 長條圖 ===== */
+.bars-wrap { overflow-x: auto; scrollbar-width: none; }
+.bars-wrap::-webkit-scrollbar { display: none; }
+.bars-wrap svg { display: block; }
+.bar-rect { cursor: pointer; }
+.bars-tip { min-height: 1.2em; font-size: .8rem; color: var(--ink-2); text-align: center; margin-top: 8px; font-variant-numeric: tabular-nums; }
+
+/* ===== 設定 ===== */
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: .92rem;
+}
+.setting-row:first-of-type { border-top: 0; }
+.setting-row input[type="date"] { min-width: 150px; }
+.setting-row input[type="date"], .setting-row input[type="text"], .setting-row select {
+  background: var(--card-2); border: 0; border-radius: 12px;
+  padding: 9px 12px; font-size: .92rem; text-align: right; max-width: 170px;
+  appearance: none; -webkit-appearance: none; color: var(--ink);
+}
+/* 設定頁：整列都可點的按鈕 */
+.row-btn { width: 100%; text-align: left; font-size: .92rem; }
+.row-btn > span:first-child { flex: 0 0 auto; }
+/* 內容過長時省略，不要撐成兩行 */
+.row-val {
+  color: var(--muted); font-size: .84rem; text-align: right;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.row-btn::after { content: '›'; color: var(--muted); flex: 0 0 auto; }
+
+.btn-small {
+  background: var(--card-2); border-radius: 999px; padding: 8px 14px;
+  font-size: .8rem; font-weight: 500;
+}
+.btn-small.danger { color: var(--danger); }
+.version { text-align: center; margin-top: 24px; }
+
+/* ===== 新增按鈕 ===== */
+.fab {
+  position: fixed; right: 22px; bottom: calc(env(safe-area-inset-bottom) + 88px);
+  width: 58px; height: 58px; border-radius: 50%;
+  background: var(--accent); color: #21251E;
+  display: grid; place-items: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,.12);
+  transition: transform .12s;
+  z-index: 20;
+}
+.fab:active { transform: scale(.92); }
+.fab svg { width: 24px; height: 24px; }
+
+/* ===== 底部分頁列 ===== */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; justify-content: space-around;
+  padding: 10px 20px calc(env(safe-area-inset-bottom) + 10px);
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  border-top: 1px solid var(--line);
+}
+.tab {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  flex: 1; font-size: .68rem; color: var(--muted); padding: 2px 4px;
+  transition: color .15s;
+}
+.tab-icon svg { width: 22px; height: 22px; stroke: currentColor; }
+.tab.active { color: var(--ink); }
+
+/* ===== 輸入面板 ===== */
+.sheet-mask {
+  position: fixed; inset: 0; background: rgba(0,0,0,.28);
+  opacity: 0; pointer-events: none; transition: opacity .22s; z-index: 30;
+}
+.sheet-mask.show { opacity: 1; pointer-events: auto; }
+.sheet.dragging { transition: none; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 31;
+  background: var(--bg); border-radius: 24px 24px 0 0;
+  padding: 10px 22px calc(env(safe-area-inset-bottom) + 16px);
+  transform: translateY(105%); transition: transform .28s cubic-bezier(.32,.72,.32,1);
+  max-width: 480px; margin: 0 auto;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.10);
+}
+.sheet.show { transform: translateY(var(--drag, 0px)); }
+/* 上方可拖曳關閉的區域：小灰條本身很細，用 padding 撐出好按的範圍 */
+.sheet-handle { padding: 6px 0 10px; cursor: grab; touch-action: none; }
+.sheet-grip { width: 40px; height: 5px; border-radius: 3px; background: var(--muted); opacity: .45; margin: 0 auto; }
+
+/* 記到哪一天 */
+.sheet-day {
+  display: flex; align-items: center; gap: 5px; margin: 0 auto 10px;
+  background: var(--card); border-radius: 999px; padding: 6px 14px;
+  font-size: .78rem; color: var(--ink-2);
+}
+.sheet-day b { color: var(--ink); font-weight: 600; }
+.day-grid { grid-template-columns: repeat(4, 1fr); }
+
+.amount-block { text-align: center; margin-bottom: 16px; }
+.amount-jpy { font-size: 2.9rem; font-weight: 650; letter-spacing: -.03em; line-height: 1.1; }
+.amount-jpy .yen { font-size: 1.6rem; color: var(--ink-2); font-weight: 500; margin-right: 2px; }
+.amount-twd { font-size: .85rem; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+/* 幣別／付款方式切換 */
+.toggle-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.cur-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--ink); color: var(--bg); border-radius: 999px;
+  padding: 8px 0; font-size: .84rem; font-weight: 500;
+}
+.cur-btn .caret { opacity: .55; font-size: .7rem; }
+.cur-sheet { z-index: 33; }
+.cur-hint { text-align: center; margin: -6px 0 14px; }
+.cur-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  max-height: 46vh; overflow-y: auto; padding-bottom: 6px;
+}
+.cur-grid button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--card); border-radius: 14px; padding: 12px 4px 10px;
+  font-size: .78rem; color: var(--ink-2);
+}
+.cur-grid button b { font-size: 1.02rem; color: var(--ink); font-weight: 600; }
+.cur-grid button.active { background: var(--ink); color: var(--bg); }
+.cur-grid button.active b { color: var(--bg); }
+.cur-grid .cur-tag { font-size: .6rem; color: var(--accent); }
+.toggle-row .cur-toggle { flex: 1; margin-bottom: 0; }
+.cur-toggle {
+  display: flex; background: var(--card); border-radius: 999px;
+  padding: 4px; margin-bottom: 12px;
+}
+.cur-toggle button {
+  flex: 1; border-radius: 999px; padding: 8px 0;
+  font-size: .84rem; font-weight: 500; color: var(--ink-2);
+  transition: background .15s, color .15s;
+}
+.cur-toggle button.active { background: var(--ink); color: var(--bg); }
+
+/* 分類選擇 */
+.cat-chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 12px; }
+.cat-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  background: var(--card); border-radius: 14px; padding: 10px 2px 8px;
+  font-size: .66rem; color: var(--ink-2); transition: background .15s, color .15s;
+}
+.cat-chip svg { width: 20px; height: 20px; stroke: currentColor; }
+.cat-chip.active { background: var(--ink); color: var(--bg); }
+
+.note-input {
+  width: 100%; background: var(--card); border: 0; border-radius: 14px;
+  padding: 12px 14px; font-size: .9rem; margin-bottom: 12px;
+}
+.note-input::placeholder { color: var(--muted); }
+
+/* 數字鍵盤 */
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.keypad button {
+  background: var(--card); border-radius: 16px; height: 54px;
+  font-size: 1.35rem; font-weight: 500; font-variant-numeric: tabular-nums;
+  transition: background .1s;
+}
+.keypad button:active { background: var(--line); }
+
+.sheet-actions { display: flex; gap: 10px; }
+.btn-save {
+  flex: 1; background: var(--ink); color: var(--bg);
+  border-radius: 999px; height: 52px; font-size: 1rem; font-weight: 600;
+  transition: transform .12s;
+}
+.btn-save:active { transform: scale(.97); }
+.btn-delete {
+  flex: 0 0 auto; padding: 0 22px; height: 52px; border-radius: 999px;
+  background: var(--card); color: var(--danger); font-size: .92rem; font-weight: 500;
+}
+
+/* 桌機預覽時置中窄欄 */
+@media (min-width: 520px) {
+  body { display: flex; justify-content: center; }
+  .view { width: 480px; }
+  .tabbar, .sheet { max-width: 480px; left: 50%; transform: translateX(-50%); }
+  .sheet { transform: translate(-50%, 105%); }
+  .sheet.show { transform: translate(-50%, var(--drag, 0px)); }
+  .fab { right: calc(50% - 240px + 22px); }
+}
+
+/* 鍵盤焦點可見 */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+/* ============================================
+   分帳模組（從 Who Pay 搬過來）
+   ============================================ */
+
+/* 成員編輯器：名字膠囊＋輸入框 */
+.setting-row.col { flex-direction: column; align-items: stretch; gap: 0; }
+.member-editor { width: 100%; }
+.m-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.m-chips:empty { display: none; }
+.m-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--card-2); border-radius: 999px; padding: 4px 6px 4px 4px;
+  font-size: .88rem;
+}
+.m-chip .x {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--muted); font-size: .85rem;
+}
+.m-chip .x[disabled] { opacity: .3; }
+.m-add { display: flex; gap: 8px; }
+.m-add input {
+  flex: 1; min-width: 0; background: var(--card-2); border: 0; border-radius: 12px;
+  padding: 10px 12px; font-size: .92rem; color: var(--ink); text-align: left;
+}
+.m-add input::placeholder { color: var(--muted); }
+.m-add button {
+  flex: 0 0 auto; background: var(--ink); color: var(--bg);
+  border-radius: 12px; padding: 0 16px; font-size: .88rem; font-weight: 600;
+}
+.setting-row .m-add input { max-width: none; }
+
+/* 頭像：名字第一個字 */
+.avatar {
+  width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
+  display: inline-grid; place-items: center;
+  background: var(--ink); color: var(--bg);
+  font-size: .72rem; font-weight: 600; line-height: 1;
+}
+.avatar.lg { width: 40px; height: 40px; border-radius: 13px; font-size: .95rem; background: var(--card); color: var(--ink); }
+/* 旅程卡片上的成員頭像疊在一起 */
+.t-avatars { display: inline-flex; margin-right: 8px; vertical-align: -6px; }
+.t-avatars .avatar { width: 22px; height: 22px; font-size: .64rem; border: 1.5px solid var(--card-2); margin-left: -7px; }
+.t-avatars .avatar:first-child { margin-left: 0; }
+
+/* 旅程卡片的「⋯」選單（電腦版也能刪除） */
+.t-menu {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 34px; height: 34px; border-radius: 12px;
+  color: var(--muted); font-size: 1.1rem; line-height: 1;
+  display: grid; place-items: center;
+}
+.t-menu:hover { background: var(--card); }
+.trip-card { padding-right: 46px; }
+
+/* 誰該給誰 */
+.settle-card { padding: 18px 16px 16px; margin-bottom: 26px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 12px; }
+.card-title { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; }
+.link-btn { color: var(--ink-2); font-size: .8rem; padding: 4px 2px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--muted); }
+.more-btn { display: block; margin: 12px auto 0; }
+.sub-label { font-size: .74rem; color: var(--muted); margin: 16px 4px 8px; }
+.list-label { font-size: .8rem; color: var(--muted); letter-spacing: .04em; margin: 0 2px 10px; }
+.transfer-list, .person-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.tr-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card-2); border-radius: 16px; padding: 12px 12px 12px 14px;
+}
+.tr-main { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.tr-who { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; row-gap: 2px; font-size: .95rem; }
+.tr-who .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr-arrow { color: var(--muted); flex: 0 0 auto; font-size: .85rem; }
+.tr-amt { font-weight: 650; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.tr-main .tr-amt { font-size: 1.05rem; letter-spacing: -.01em; margin-left: auto; }
+.tr-row .btn-small { flex: 0 0 auto; }
+.btn-small.ink { background: var(--ink); color: var(--bg); }
+.tr-row.done { background: none; padding: 8px 4px; border-top: 1px solid var(--line); border-radius: 0; }
+.tr-row.done:first-child { border-top: 0; }
+.tr-row.done .tr-who, .tr-row.done .tr-amt { color: var(--ink-2); font-weight: 500; }
+.all-clear { text-align: center; padding: 18px 0 8px; color: var(--ink-2); font-size: .9rem; line-height: 1.7; }
+
+/* 每個人：先付了多少、該出多少 */
+.p-row { background: var(--card-2); border-radius: 16px; padding: 12px 14px; }
+.p-top { display: flex; align-items: center; gap: 10px; }
+.p-name { flex: 1; font-size: .92rem; font-weight: 500; min-width: 0; }
+.p-net { font-size: .88rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.p-net.plus { color: var(--ink); }
+.p-net.minus { color: var(--danger); }
+.p-net.zero { color: var(--muted); font-weight: 500; }
+.p-sub { font-size: .72rem; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.p-bar { position: relative; height: 6px; margin-top: 8px; background: var(--card); border-radius: 3px; }
+.p-bar::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); opacity: .5; }
+.p-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.p-fill.plus { left: 50%; background: var(--accent); }
+.p-fill.minus { right: 50%; background: var(--danger); opacity: .75; }
+.btn-share { width: 100%; height: 50px; margin-top: 12px; font-size: .95rem; }
+
+/* 分帳帳目列：金額在右邊，「記進我的帳」自己換一行 */
+.split-row { flex-wrap: wrap; }
+.split-row .e-amount { margin-left: auto; text-align: right; }
+.split-row .btn-tomine { margin: 10px 0 0 auto; }
+.btn-tomine {
+  flex: 0 0 auto; background: var(--accent); color: #21251E;
+  border-radius: 999px; padding: 7px 12px; font-size: .74rem; font-weight: 600;
+}
+.btn-tomine.done { background: var(--card); color: var(--muted); }
+
+/* 分帳面板：內容可捲動、鍵盤固定在底部 */
+.sheet.tall { display: flex; flex-direction: column; max-height: 94dvh; }
+.sheet.tall > * { flex: 0 0 auto; }
+.sheet.tall .sheet-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  margin: 0 -22px; padding: 0 22px 4px; scrollbar-width: none;
+}
+.sheet-scroll::-webkit-scrollbar { display: none; }
+.sheet-top { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.sheet.tall .sheet-day { position: relative; }
+.sheet-day input[type="date"] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: 0; -webkit-appearance: none; appearance: none;
+}
+.field-label { font-size: .74rem; color: var(--ink-2); letter-spacing: .04em; margin: 0 2px 8px; }
+.field-label .muted { font-size: .7rem; letter-spacing: 0; }
+.split-head { display: flex; justify-content: space-between; align-items: baseline; }
+.per-person { font-size: .8rem; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* 誰付的：單選膠囊 */
+.payer-chips {
+  display: flex; gap: 8px; overflow-x: auto; margin: 0 -22px 14px;
+  padding: 0 22px 2px; scrollbar-width: none;
+}
+.payer-chips::-webkit-scrollbar { display: none; }
+.payer-chip {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
+  background: var(--card); border-radius: 999px; padding: 5px 14px 5px 5px;
+  font-size: .86rem; color: var(--ink-2); transition: background .15s, color .15s;
+}
+.payer-chip .avatar { background: var(--card-2); color: var(--ink); }
+.payer-chip.active { background: var(--ink); color: var(--bg); }
+.payer-chip.active .avatar { background: var(--accent); color: #21251E; }
+
+/* 要分給誰：可複選 */
+.who-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.who-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--card); border-radius: 999px; padding: 8px 14px 8px 10px;
+  font-size: .86rem; color: var(--muted); transition: background .15s, color .15s;
+}
+.who-chip .box {
+  width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--muted);
+  display: grid; place-items: center; font-size: .7rem; line-height: 1; color: transparent;
+}
+.who-chip.on { background: var(--card-2); color: var(--ink); }
+.who-chip.on .box { background: var(--ink); border-color: var(--ink); color: var(--accent); }
+.mode-btn { display: block; margin: 10px auto 0; }
+
+/* 各自金額：一人一格 */
+.share-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+.share-tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  background: var(--card); border-radius: 14px; padding: 9px 11px;
+  text-align: left; transition: background .15s, color .15s; min-width: 0;
+}
+.share-tile .s-name { font-size: .72rem; color: var(--ink-2); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.share-tile .s-amt { font-size: 1rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-tile.has { background: var(--card-2); }
+.share-tile.has .s-amt { color: var(--ink); }
+.share-tile.active { background: var(--ink); }
+.share-tile.active .s-name { color: var(--bg); opacity: .75; }
+.share-tile.active .s-amt { color: var(--bg); }
+.share-tile.active .s-amt::after {
+  content: ''; display: inline-block; width: 2px; height: .95em; margin-left: 2px;
+  background: var(--accent); vertical-align: -2px; animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+#splitKeypad { margin: 12px 0; }
+#splitKeypad button { height: 50px; }
+@media (max-height: 700px) { #splitKeypad button { height: 42px; } #splitSheet .amount-jpy { font-size: 2.3rem; } }
+
+/* 小提示（取代 alert，可帶一顆動作鈕） */
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 96px); z-index: 50;
+  display: flex; align-items: center; gap: 12px;
+  transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  background: var(--ink); color: var(--bg); border-radius: 999px;
+  padding: 10px 14px 10px 18px; font-size: .86rem; white-space: nowrap;
+  max-width: calc(100vw - 40px);
+  transition: opacity .2s, transform .2s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast .t-act {
+  background: var(--accent); color: #21251E; border-radius: 999px;
+  padding: 6px 12px; font-size: .8rem; font-weight: 600;
+}
+
+/* 旅程卡片的「⋯」選單 */
+.entry-row.has-pop { overflow: visible; }
+.t-pop {
+  position: absolute; top: 44px; right: 10px; z-index: 5;
+  background: var(--card-2); border-radius: 14px; padding: 6px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.16);
+}
+.t-pop-item {
+  display: block; width: 100%; text-align: left; white-space: nowrap;
+  padding: 10px 16px; font-size: .9rem; border-radius: 10px;
+}
+.t-pop-item.danger { color: var(--danger); }
+.t-pop-item:active { background: var(--card); }

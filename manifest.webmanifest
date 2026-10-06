@@ -1,0 +1,22 @@
+{
+  "name": "Travel Pocket 測試版",
+  "short_name": "TP 測試版",
+  "description": "旅遊記帳與分帳",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#EFEEE9",
+  "theme_color": "#EFEEE9",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
